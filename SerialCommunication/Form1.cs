@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -14,6 +14,7 @@ namespace SerialCommunication
 {
     public partial class Form1 : Form
     {
+        private System.IO.Ports.SerialPort serialPortArduino = new System.IO.Ports.SerialPort();
         public Form1()
         {
             InitializeComponent();
@@ -54,7 +55,77 @@ namespace SerialCommunication
 
         private void buttonConnect_Click(object sender, EventArgs e)
         {
-            // abc def ghi jkl
+            try
+            {
+                if (serialPortArduino.IsOpen)
+                {
+                    // Disconnect
+                    serialPortArduino.Close();
+                    radioButtonVerbonden.Checked = false;
+                    buttonConnect.Text = "Connect";
+                    labelStatus.Text = "Disconnected";
+                }
+                else
+                {
+                    // Connect
+                    if (comboBoxPoort.SelectedItem == null)
+                    {
+                        MessageBox.Show("Select a COM port first.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    serialPortArduino.PortName = comboBoxPoort.SelectedItem.ToString();
+                    serialPortArduino.BaudRate = int.Parse(comboBoxBaudrate.SelectedItem.ToString());
+                    serialPortArduino.DataBits = (int)numericUpDownDatabits.Value;
+
+                    // Parity
+                    if (radioButtonParityNone.Checked) serialPortArduino.Parity = Parity.None;
+                    else if (radioButtonParityEven.Checked) serialPortArduino.Parity = Parity.Even;
+                    else if (radioButtonParityOdd.Checked) serialPortArduino.Parity = Parity.Odd;
+                    else if (radioButtonParityMark.Checked) serialPortArduino.Parity = Parity.Mark;
+                    else if (radioButtonParitySpace.Checked) serialPortArduino.Parity = Parity.Space;
+
+                    // StopBits
+                    if (radioButtonStopbitsNone.Checked) serialPortArduino.StopBits = StopBits.None;
+                    else if (radioButtonStopbitsOne.Checked) serialPortArduino.StopBits = StopBits.One;
+                    else if (radioButtonStopbitsOnePointFive.Checked) serialPortArduino.StopBits = StopBits.OnePointFive;
+                    else if (radioButtonStopbitsTwo.Checked) serialPortArduino.StopBits = StopBits.Two;
+
+                    // Handshake
+                    if (radioButtonHandshakeNone.Checked) serialPortArduino.Handshake = Handshake.None;
+                    else if (radioButtonHandshakeRTS.Checked) serialPortArduino.Handshake = Handshake.RequestToSend;
+                    else if (radioButtonHandshakeRTSXonXoff.Checked) serialPortArduino.Handshake = Handshake.RequestToSendXOnXOff;
+                    else if (radioButtonHandshakeXonXoff.Checked) serialPortArduino.Handshake = Handshake.XOnXOff;
+
+                    serialPortArduino.RtsEnable = checkBoxRtsEnable.Checked;
+                    serialPortArduino.DtrEnable = checkBoxDtrEnable.Checked;
+                    serialPortArduino.ReadTimeout = 1000;
+                    serialPortArduino.WriteTimeout = 1000;
+
+                    serialPortArduino.Open();
+
+                    // ping/pong check
+                    serialPortArduino.DiscardInBuffer();
+                    serialPortArduino.WriteLine("ping");
+                    string reply = serialPortArduino.ReadLine().Trim();
+                    if (reply == "pong")
+                    {
+                        radioButtonVerbonden.Checked = true;
+                        buttonConnect.Text = "Disconnect";
+                        labelStatus.Text = $"Connected to {serialPortArduino.PortName}";
+                    }
+                    else
+                    {
+                        labelStatus.Text = "Unexpected reply: " + reply;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                labelStatus.Text = "Error: " + ex.Message;
+            }
         }
     }
 }
+
