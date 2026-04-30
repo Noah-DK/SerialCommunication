@@ -7,6 +7,7 @@ using System.IO.Ports;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
 
@@ -99,14 +100,16 @@ namespace SerialCommunication
 
                     serialPortArduino.RtsEnable = checkBoxRtsEnable.Checked;
                     serialPortArduino.DtrEnable = checkBoxDtrEnable.Checked;
-                    serialPortArduino.ReadTimeout = 1000;
-                    serialPortArduino.WriteTimeout = 1000;
+                    serialPortArduino.ReadTimeout = 3000;
+                    serialPortArduino.WriteTimeout = 3000;
 
                     serialPortArduino.Open();
+                    Thread.Sleep(2000);
 
                     // ping/pong check
                     serialPortArduino.DiscardInBuffer();
                     serialPortArduino.WriteLine("ping");
+                    serialPortArduino.ReadTimeout = 3000;
                     string reply = serialPortArduino.ReadLine().Trim();
                     if (reply == "pong")
                     {
