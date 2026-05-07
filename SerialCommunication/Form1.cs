@@ -155,38 +155,46 @@ namespace SerialCommunication
 
             try
             {
-                serialPortArduino.DiscardInBuffer();
+                // Read status lines sent periodically by the Arduino (non-blocking)
+                serialPortArduino.ReadTimeout = 200; // short timeout for ReadLine
 
-                // Read desired temperature from potentiometer (A0)
-                serialPortArduino.WriteLine("get a0");
-                string reply0 = serialPortArduino.ReadLine().Trim();
-                int raw0 = ParseAnalogReply(reply0);
-                double desired = raw0 * (40.0 / 1023.0) + 5.0; // scale 0..1023 -> 5..45
-
-                // Read current temperature from LM35 (A1)
-                serialPortArduino.WriteLine("get a1");
-                string reply1 = serialPortArduino.ReadLine().Trim();
-                int raw1 = ParseAnalogReply(reply1);
-                double current = raw1 * (500.0 / 1023.0); // scale 0..1023 -> 0..500 (LM35)
-
-                labelGewensteTemp.Text = desired.ToString("0.0") + " °C";
-                labelHuidigeTemp.Text = current.ToString("0.0") + " °C";
-
-                // Turn LED on pin 2 on when current < desired
-                if (current < desired)
+                while (serialPortArduino.BytesToRead > 0)
                 {
-                    serialPortArduino.WriteLine("set d2 1");
-                }
-                else
-                {
-                    serialPortArduino.WriteLine("set d2 0");
-                }
+                    string line = serialPortArduino.ReadLine().Trim();
+                    if (string.IsNullOrEmpty(line)) continue;
 
-                labelStatus.Text = $"Last update: {DateTime.Now:T}";
+                    // Expected format: "state: X | threshold: 25.0 C | current: 30.2 C"
+                    string parsedState = null;
+                    double parsedThreshold = double.NaN;
+                    double parsedCurrent = double.NaN;
+
+                    var parts = line.Split('|');
+                    foreach (var p in parts)
+                    {
+                        var s = p.Trim();
+                        if (s.StartsWith("state:")) parsedState = s.Substring(6).Trim();
+                        else if (s.StartsWith("threshold:"))
+                        {
+                            var v = s.Substring(10).Trim();
+                            v = v.Replace("C", "").Replace("°", "").Trim();
+                            double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out parsedThreshold);
+                        }
+                        else if (s.StartsWith("current:"))
+                        {
+                            var v = s.Substring(8).Trim();
+                            v = v.Replace("C", "").Replace("°", "").Trim();
+                            double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out parsedCurrent);
+                        }
+                    }
+
+                    if (!double.IsNaN(parsedThreshold)) labelGewensteTemp.Text = parsedThreshold.ToString("0.0") + " °C"; // shows alarm threshold
+                    if (!double.IsNaN(parsedCurrent)) labelHuidigeTemp.Text = parsedCurrent.ToString("0.0") + " °C";
+                    if (!string.IsNullOrEmpty(parsedState)) labelStatus.Text = parsedState; // OK / ALARM / BEVESTIGD
+                }
             }
             catch (TimeoutException)
             {
-                labelStatus.Text = "Timeout reading from Arduino";
+                // no data available this tick; that's fine
             }
             catch (System.IO.IOException ioex)
             {
