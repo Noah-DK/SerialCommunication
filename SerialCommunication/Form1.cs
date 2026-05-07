@@ -147,6 +147,9 @@ namespace SerialCommunication
             if (!serialPortArduino.IsOpen)
             {
                 labelStatus.Text = "Not connected";
+                radioButtonVerbonden.Checked = false;
+                buttonConnect.Text = "Connect";
+                timerOefening5.Stop();
                 return;
             }
 
@@ -185,9 +188,40 @@ namespace SerialCommunication
             {
                 labelStatus.Text = "Timeout reading from Arduino";
             }
+            catch (System.IO.IOException ioex)
+            {
+                HandleDisconnect("IO Error: " + ioex.Message);
+            }
+            catch (InvalidOperationException iopex)
+            {
+                HandleDisconnect("Invalid operation: " + iopex.Message);
+            }
+            catch (UnauthorizedAccessException ua)
+            {
+                HandleDisconnect("Access denied: " + ua.Message);
+            }
             catch (Exception ex)
             {
                 labelStatus.Text = "Error: " + ex.Message;
+            }
+        }
+
+        private void HandleDisconnect(string message)
+        {
+            try
+            {
+                if (serialPortArduino.IsOpen)
+                {
+                    try { serialPortArduino.Close(); } catch { }
+                }
+            }
+            finally
+            {
+                timerOefening5.Stop();
+                radioButtonVerbonden.Checked = false;
+                buttonConnect.Text = "Connect";
+                labelStatus.Text = "Disconnected: " + message;
+                MessageBox.Show("Connection lost: " + message + "\nTimer stopped.", "Disconnected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
