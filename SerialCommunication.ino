@@ -8,6 +8,24 @@
 int numberOfPings;
 SerialCommand sCmd(SerialPort);
 
+// Alarm FSM states
+enum AlarmState {STATE_OK = 0, STATE_ALARM = 1, STATE_CONFIRMED = 2};
+AlarmState alarmState = STATE_OK;
+
+// pins (per exercise)
+const uint8_t PIN_LED = 2;    // LED
+const uint8_t PIN_BUZZER = 3; // Buzzer
+const uint8_t PIN_BUTTON = 5; // Button (use INPUT_PULLUP)
+
+// timing
+unsigned long lastAlarmMillis = 0;
+const unsigned long ALARM_INTERVAL_MS = 1000;
+
+// button debounce
+int lastButtonReading = HIGH;
+unsigned long lastDebounceTime = 0;
+const unsigned long DEBOUNCE_DELAY = 50;
+
 void setup() 
 {
   digitalWrite(13, LOW);
@@ -23,7 +41,7 @@ void setup()
 
   for (int i = 2; i < 5; i++) pinMode(i, OUTPUT);
   for (int i = 9; i < 12; i++) pinMode(i, OUTPUT);
-  for (int i = 5; i < 8; i++) pinMode(i, INPUT);
+  for (int i = 5; i < 8; i++) pinMode(i, INPUT_PULLUP);
   for (int i = A0; i <= A5; i++) pinMode(i, INPUT);
 
   analogReference(DEFAULT);
@@ -34,6 +52,119 @@ void setup()
 void loop() 
 {
   sCmd.readSerial();
+
+  // run alarm FSM periodically
+  unsigned long now = millis();
+  if (now - lastAlarmMillis >= ALARM_INTERVAL_MS)
+  {
+    lastAlarmMillis = now;
+    runAlarmCycle();
+  }
+}
+
+// Read sensors, update FSM and outputs, and print status over serial
+void runAlarmCycle()
+{
+  // Read LM35 at A0 (current temperature)
+  int rawCurrent = analogReadDelay(A0, 50000);
+  double currentC = rawCurrent * (500.0 / 1023.0); // 0..500°C per earlier scaling (LM35)
+
+  // Read potentiometer at A1 (alarm threshold) -> scale 0..1023 -> -10..60
+  int rawPot = analogReadDelay(A1, 50000);
+  double alarmThreshold = rawPot * (70.0 / 1023.0) - 10.0; // -10..60°C
+
+  // Read button (active LOW because INPUT_PULLUP)
+  int reading = digitalRead(PIN_BUTTON);
+  if (reading != lastButtonReading)
+  {
+    lastDebounceTime = millis();
+  }
+  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY)
+  {
+    // if the button state has changed:
+    if (reading == LOW && lastButtonReading == HIGH)
+    {
+      // button pressed event (falling edge)
+      handleButtonPress(currentC, alarmThreshold);
+    }
+  }
+  lastButtonReading = reading;
+
+  // FSM transitions (when not button-driven)
+  if (alarmState == STATE_OK)
+  {
+    if (currentC > alarmThreshold)
+    {
+      alarmState = STATE_ALARM; // go into alarm when threshold exceeded
+    }
+  }
+  else if (alarmState == STATE_ALARM)
+  {
+    // remain in ALARM until user confirms or button forces OK when below threshold
+    // nothing automatic here
+  }
+  else if (alarmState == STATE_CONFIRMED)
+  {
+    // go back to OK if temperature drops below threshold
+    if (currentC < alarmThreshold)
+    {
+      alarmState = STATE_OK;
+    }
+  }
+
+  // Outputs according to state
+  switch (alarmState)
+  {
+    case STATE_OK:
+      digitalWrite(PIN_LED, LOW);
+      digitalWrite(PIN_BUZZER, LOW);
+      break;
+    case STATE_ALARM:
+      digitalWrite(PIN_LED, HIGH);
+      digitalWrite(PIN_BUZZER, HIGH);
+      break;
+    case STATE_CONFIRMED:
+      digitalWrite(PIN_LED, HIGH);
+      digitalWrite(PIN_BUZZER, LOW);
+      break;
+  }
+
+  // Print status to serial (one-line, easy to parse)
+  SerialPort.print(F("state: "));
+  if (alarmState == STATE_OK) SerialPort.print(F("OK"));
+  else if (alarmState == STATE_ALARM) SerialPort.print(F("ALARM"));
+  else SerialPort.print(F("BEVESTIGD"));
+  SerialPort.print(F(" | threshold: "));
+  SerialPort.print(alarmThreshold, 1);
+  SerialPort.print(F(" C | current: "));
+  SerialPort.print(currentC, 1);
+  SerialPort.println(F(" C"));
+}
+
+void handleButtonPress(double currentC, double alarmThreshold)
+{
+  if (alarmState == STATE_ALARM)
+  {
+    // if temperature already dropped below threshold, go straight to OK
+    if (currentC < alarmThreshold)
+    {
+      alarmState = STATE_OK;
+    }
+    else
+    {
+      // acknowledge and go to confirmed
+      alarmState = STATE_CONFIRMED;
+    }
+  }
+  else if (alarmState == STATE_CONFIRMED)
+  {
+    // allow user to cancel confirmation (toggle back to OK)
+    if (currentC < alarmThreshold)
+    {
+      alarmState = STATE_OK;
+    }
+  }
+  // if OK and button pressed, no action
 }
 
 void onUnknownCommand(char* cmd)
