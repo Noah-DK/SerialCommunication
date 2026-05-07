@@ -104,7 +104,7 @@ namespace SerialCommunication
                     serialPortArduino.WriteTimeout = 3000;
 
                     serialPortArduino.Open();
-                    Thread.Sleep(2000);
+
 
                     // ping/pong check
                     serialPortArduino.DiscardInBuffer();
@@ -128,6 +128,90 @@ namespace SerialCommunication
                 MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 labelStatus.Text = "Error: " + ex.Message;
             }
+        }
+
+        private void tabControl_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (tabControl.SelectedTab == tabPageOefening5)
+            {
+                timerOefening5.Start();
+            }
+            else
+            {
+                timerOefening5.Stop();
+            }
+        }
+
+        private void timerOefening5_Tick(object sender, EventArgs e)
+        {
+            if (!serialPortArduino.IsOpen)
+            {
+                labelStatus.Text = "Not connected";
+                return;
+            }
+
+            try
+            {
+                serialPortArduino.DiscardInBuffer();
+
+                // Read desired temperature from potentiometer (A0)
+                serialPortArduino.WriteLine("get a0");
+                string reply0 = serialPortArduino.ReadLine().Trim();
+                int raw0 = ParseAnalogReply(reply0);
+                double desired = raw0 * (40.0 / 1023.0) + 5.0; // scale 0..1023 -> 5..45
+
+                // Read current temperature from LM35 (A1)
+                serialPortArduino.WriteLine("get a1");
+                string reply1 = serialPortArduino.ReadLine().Trim();
+                int raw1 = ParseAnalogReply(reply1);
+                double current = raw1 * (500.0 / 1023.0); // scale 0..1023 -> 0..500 (LM35)
+
+                labelGewensteTemp.Text = desired.ToString("0.0") + " °C";
+                labelHuidigeTemp.Text = current.ToString("0.0") + " °C";
+
+                // Turn LED on pin 2 on when current < desired
+                if (current < desired)
+                {
+                    serialPortArduino.WriteLine("set d2 1");
+                }
+                else
+                {
+                    serialPortArduino.WriteLine("set d2 0");
+                }
+
+                labelStatus.Text = $"Last update: {DateTime.Now:T}";
+            }
+            catch (TimeoutException)
+            {
+                labelStatus.Text = "Timeout reading from Arduino";
+            }
+            catch (Exception ex)
+            {
+                labelStatus.Text = "Error: " + ex.Message;
+            }
+        }
+
+        private int ParseAnalogReply(string reply)
+        {
+            if (string.IsNullOrEmpty(reply)) return 0;
+            var parts = reply.Split(':');
+            if (parts.Length >= 2)
+            {
+                var numPart = parts[1].Trim();
+                int val = 0;
+                int i = 0;
+                while (i < numPart.Length && !char.IsDigit(numPart[i])) i++;
+                int j = i;
+                while (j < numPart.Length && char.IsDigit(numPart[j])) j++;
+                if (i < j)
+                {
+                    int.TryParse(numPart.Substring(i, j - i), out val);
+                    return val;
+                }
+            }
+            var digits = new string(reply.Where(c => char.IsDigit(c)).ToArray());
+            if (digits.Length > 0) { if (int.TryParse(digits, out int v2)) return v2; }
+            return 0;
         }
     }
 }

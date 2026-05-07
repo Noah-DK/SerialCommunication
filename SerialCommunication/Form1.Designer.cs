@@ -33,6 +33,7 @@
             this.labelPoort = new System.Windows.Forms.Label();
             this.comboBoxPoort = new System.Windows.Forms.ComboBox();
             this.tabControl = new System.Windows.Forms.TabControl();
+            this.timerOefening5 = new System.Windows.Forms.Timer();
             this.tabPageInstellingen = new System.Windows.Forms.TabPage();
             this.checkBoxDtrEnable = new System.Windows.Forms.CheckBox();
             this.checkBoxRtsEnable = new System.Windows.Forms.CheckBox();
@@ -171,6 +172,7 @@
             this.tabControl.Margin = new System.Windows.Forms.Padding(4);
             this.tabControl.Name = "tabControl";
             this.tabControl.SelectedIndex = 0;
+            this.tabControl.SelectedIndexChanged += new System.EventHandler(this.tabControl_SelectedIndexChanged);
             this.tabControl.Size = new System.Drawing.Size(1045, 513);
             this.tabControl.TabIndex = 9;
             // 
@@ -843,22 +845,28 @@
             this.pictureBox5.TabIndex = 0;
             this.pictureBox5.TabStop = false;
             // 
+            // timerOefening5
+            // 
+            this.timerOefening5.Interval = 1000;
+            this.timerOefening5.Tick += new System.EventHandler(this.timerOefening5_Tick);
+            // 
             // statusStrip
             // 
             this.statusStrip.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.labelStatus});
-            this.statusStrip.Location = new System.Drawing.Point(0, 587);
+            this.statusStrip.Location = new System.Drawing.Point(0, 585);
             this.statusStrip.Name = "statusStrip";
             this.statusStrip.Padding = new System.Windows.Forms.Padding(1, 0, 19, 0);
-            this.statusStrip.Size = new System.Drawing.Size(1077, 22);
+            this.statusStrip.Size = new System.Drawing.Size(1077, 24);
             this.statusStrip.TabIndex = 10;
             this.statusStrip.Text = "statusStrip1";
+            
             // 
             // labelStatus
             // 
             this.labelStatus.Name = "labelStatus";
-            this.labelStatus.Size = new System.Drawing.Size(0, 16);
+            this.labelStatus.Size = new System.Drawing.Size(0, 18);
             // 
             // Form1
             // 
