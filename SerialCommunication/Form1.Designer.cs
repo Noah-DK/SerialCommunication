@@ -977,6 +977,7 @@
         internal System.Windows.Forms.Label labelGewensteTemp;
         internal System.Windows.Forms.Label label9;
         internal System.Windows.Forms.PictureBox pictureBox5;
+        private System.Windows.Forms.Timer timerOefening5;
         private System.Windows.Forms.StatusStrip statusStrip;
         private System.Windows.Forms.ToolStripStatusLabel labelStatus;
     }
